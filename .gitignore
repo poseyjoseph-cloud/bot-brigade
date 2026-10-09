@@ -1,0 +1,5 @@
+.DS_Store
+dist/
+# Mockup renders use Blizzard game art; keep them out of the public repository.
+mockups/
+__pycache__/

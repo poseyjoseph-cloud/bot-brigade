@@ -1,0 +1,10 @@
+<Bindings>
+	<Binding name="BOTBRIGADE_RING" header="BOTBRIGADE">BotBrigade_Ring()</Binding>
+	<Binding name="BOTBRIGADE_TEAM">BotBrigade_Choose("team")</Binding>
+	<Binding name="BOTBRIGADE_PICK">BotBrigade_Pick()</Binding>
+	<Binding name="BOTBRIGADE_QUEST">BotBrigade_Choose("quest")</Binding>
+	<Binding name="BOTBRIGADE_SMART">BotBrigade_Choose("smart")</Binding>
+	<Binding name="BOTBRIGADE_LEEROY">BotBrigade_Choose("leeroy")</Binding>
+	<Binding name="BOTBRIGADE_PULLBACK">BotBrigade_Choose("pullback")</Binding>
+	<Binding name="BOTBRIGADE_STOP">BotBrigade_Choose("stop")</Binding>
+</Bindings>

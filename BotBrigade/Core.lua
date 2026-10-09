@@ -5,7 +5,7 @@
 
 local W = {}
 BotBrigade = W
-W.version = "1.2.1"
+W.version = "1.2.2"
 
 ------------------------------------------------------------------------
 -- Static data
@@ -228,12 +228,16 @@ pump:SetScript("OnUpdate", function()
         Transmit(table.remove(queue, 1))
         nextSend = t + SEND_GAP
     end
+    -- Run due timers in the order they were set.
+    local due
     for i = #timers, 1, -1 do
-        local timer = timers[i]
-        if t >= timer.at then
-            table.remove(timers, i)
-            timer.fn()
+        if t >= timers[i].at then
+            due = due or {}
+            table.insert(due, 1, table.remove(timers, i))
         end
+    end
+    if due then
+        for _, timer in ipairs(due) do timer.fn() end
     end
 end)
 
@@ -375,7 +379,24 @@ local function Bring(list)
     W:Status(text, "info")
 end
 
+-- Group members who are logged out. After you log out (or get disconnected) your
+-- characters stay in your group as offline members; these come back first.
+function W:OfflineMembers()
+    local names = {}
+    for _, m in ipairs(self:Members()) do
+        if m.name and m.name ~= UNKNOWNOBJECT and not UnitIsConnected(m.unit) then
+            table.insert(names, m.name)
+        end
+    end
+    return names
+end
+
 function W:CallTeam()
+    local offline = self:OfflineMembers()
+    if #offline > 0 then
+        Bring(offline)
+        return
+    end
     local alts = self:AltNames()
     if #alts == 0 then
         LookUpCharacters("call")
@@ -399,6 +420,12 @@ function W:SendHome(name)
 end
 
 function W:Summon(name)
+    local m = self:Member(name)
+    if m and not UnitIsConnected(m.unit) then
+        -- Logged out: log them back in; they're brought over once they arrive.
+        Bring({ name })
+        return
+    end
     self:SendWhisper(name, "summon")
     self:SendWhisper(name, "follow")
 end
@@ -577,7 +604,11 @@ function W:Regroup()
     if self.db.mode ~= "stop" and not self.dc.enabled then
         self:SendParty("follow")
     end
-    self:Status("Bringing your team to you.", "good")
+    if #self:OfflineMembers() > 0 then
+        self:Status("Bringing your team to you. Some are logged out: press Call Team to bring them back.", "info")
+    else
+        self:Status("Bringing your team to you.", "good")
+    end
 end
 
 -- Logs your own characters out and asks every other bot to leave the group.

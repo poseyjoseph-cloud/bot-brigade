@@ -526,6 +526,15 @@ local function OpenMateMenu(slot)
         W:PickTeam()
         return
     end
+    if not UnitIsConnected(m.unit) then
+        EasyMenu({
+            { text = m.name .. " (logged out)", isTitle = true, notCheckable = true },
+            { text = "Log back in", notCheckable = true, func = function() W:Summon(m.name) end },
+            { text = "Remove from group", notCheckable = true, func = function() UninviteUnit(m.name) end },
+            { text = "Close", notCheckable = true, func = function() CloseDropDownMenus() end },
+        }, menuFrame, "cursor", 0, 0, "MENU")
+        return
+    end
     local menu = {
         { text = m.name, isTitle = true, notCheckable = true },
         { text = "Bring to me", notCheckable = true, func = function() W:Summon(m.name) end },
@@ -764,7 +773,11 @@ for _, s in ipairs(slots) do
         local m = self.member
         if m then
             local role = W.db.roles[m.name]
-            Tooltip(self, m.name, { (role and (W.ROLE_NAME[role] .. ". ") or "") .. "Click for options." })
+            if UnitIsConnected(m.unit) then
+                Tooltip(self, m.name, { (role and (W.ROLE_NAME[role] .. ". ") or "") .. "Click for options." })
+            else
+                Tooltip(self, m.name, { "Logged out. Click to log them back in, or press Call Team." })
+            end
         else
             Tooltip(self, "Empty place", { "Click to choose who joins your team." })
         end

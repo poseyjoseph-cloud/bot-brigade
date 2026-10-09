@@ -336,5 +336,31 @@ check(UNINVITED[1] == "Alpha", "Dismiss takes offline teammates out of the group
 OFFLINE = {}
 TAKE()
 
+-- New session: the group is full of logged-out teammates and this character
+-- doesn't know its alts yet. Call Team brings them straight back, no lookup.
+PARTY = { { "Kat", "PRIEST" }, { "Pala", "PALADIN" }, { "Gno", "MAGE" }, { "Vix", "ROGUE" } }
+OFFLINE = { Kat = true, Pala = true, Gno = true, Vix = true }
+FIRE("PARTY_MEMBERS_CHANGED")
+TICK(3)
+TAKE()
+W.db.alts, W.db.team = {}, {}
+LAST_MENU = nil
+W:Choose("team")
+TICK(1)
+out = TAKE()
+check(has(out, "SAY | .playerbots bot add Gno,Kat,Pala,Vix") or has(out, "SAY | .playerbots bot add Kat,Pala,Gno,Vix"),
+    "Call Team logs every offline teammate back in at once")
+check(not has(out, "bot list") and LAST_MENU == nil, "without a character lookup or the picker")
+-- Bring to me on a logged-out teammate logs them in instead of whispering.
+W:Summon("Kat")
+TICK(1)
+out = TAKE()
+check(has(out, "SAY | .playerbots bot add Kat") and not has(out, "WHISPER:Kat"), "Bring to me logs a logged-out teammate in")
+OFFLINE = {}
+FIRE("PARTY_MEMBER_ENABLE")
+TICK(6)
+out = TAKE()
+check(has(out, "WHISPER:Kat | summon") and has(out, "WHISPER:Vix | follow"), "and brings them over once they're online")
+
 print(failures == 0 and "ALL PASSED" or (failures .. " FAILED"))
 os.exit(failures == 0 and 0 or 1)

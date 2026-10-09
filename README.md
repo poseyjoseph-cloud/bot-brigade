@@ -30,8 +30,10 @@ A round medallion appears on your screen with your banner in the middle.
 | In a dungeon | **Careful** | The tank leads and pulls every group of enemies back to the team. Slowest, safest. |
 | | **Smart** | The tank leads, charges small groups and pulls big ones back. Recommended. |
 | | **Leeroy** | The tank leads and charges into everything. Fastest, riskiest. |
+| Left side | **Regroup** | Teleports everyone in your group to you right now. Great when a bot is stuck, or to pull a fight back to you. |
+| Right side | **Dismiss** | Sends your team home: your characters log out and other bots leave the group. It asks first. |
 
-You can also press **1** to **6** while the medallion is open. **Escape** closes it.
+You can also press **1** to **8** while the medallion is open. **Escape** closes it.
 
 **Click a teammate's picture** to bring them to you, change their role (Tank, Healer, Damage), train them, or log them out.
 
@@ -59,6 +61,8 @@ You can also press **1** to **6** while the medallion is open. **Escape** closes
 | `/bb stop` | Wait Here |
 | `/bb share` | Share all your quests with your team |
 | `/bb revive` | Revive fallen teammates |
+| `/bb regroup` | Bring everyone to you right now |
+| `/bb dismiss` | Send your team home (asks first) |
 | `/bb scale 1.2` | Make it bigger or smaller |
 | `/bb reset` | Put it back in the default spot |
 

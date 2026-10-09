@@ -392,6 +392,62 @@ for i, mode in ipairs(W.MODES) do
     table.insert(modeWidgets, b)
 end
 
+-- Team actions on the left and right of the open ring: Regroup and Dismiss.
+StaticPopupDialogs["BOTBRIGADE_DISMISS"] = {
+    text = "Send your whole team home?\n\nYour characters log out and other bots leave your group.",
+    button1 = "Send home",
+    button2 = CANCEL,
+    OnAccept = function() W:DismissTeam() end,
+    timeout = 0,
+    whileDead = 1,
+    hideOnEscape = 1,
+}
+
+local TEAM_ACTIONS = {
+    { key = 7, label = "Regroup", angle = 270, icon = "Interface\\Icons\\Spell_Shadow_Twilight",
+      tip = "Teleports everyone in your group to you right now. Use it when a teammate is stuck, or to pull the fight back to you.",
+      binding = "BOTBRIGADE_REGROUP", run = function() W:Regroup() end },
+    { key = 8, label = "Dismiss", angle = 90, icon = "Interface\\Icons\\INV_Misc_Rune_01",
+      tip = "Sends your team home: your characters log out and other bots leave the group. Asks first.",
+      binding = "BOTBRIGADE_DISMISS", run = function() StaticPopup_Show("BOTBRIGADE_DISMISS") end },
+}
+local actionByKey = {}
+
+for _, action in ipairs(TEAM_ACTIONS) do
+    local x, y = Polar(MODE_RADIUS, action.angle)
+    local b = RoundFrame(main, 48)
+    b:SetPoint("CENTER", main, "CENTER", x, y)
+    b:SetFrameLevel(disc:GetFrameLevel() + 5)
+    SetPortraitToTexture(b.art, action.icon)
+
+    local keyBack = b:CreateTexture(nil, "OVERLAY")
+    keyBack:SetTexture("Interface\\Minimap\\UI-Minimap-Background")
+    keyBack:SetVertexColor(0, 0, 0, 0.85)
+    Size(keyBack, 17)
+    keyBack:SetPoint("CENTER", b, "TOPRIGHT", -6, -6)
+    local key = Text(b, "NumberFontNormalSmall")
+    key:SetPoint("CENTER", keyBack, "CENTER", 1, 0)
+    key:SetText(action.key)
+
+    local label = Text(b, "GameFontNormal")
+    label:SetPoint("TOP", b, "BOTTOM", 0, -1)
+    label:SetText(action.label)
+
+    local function Run()
+        PlayIf("igMainMenuOptionCheckBoxOn")
+        Close()
+        action.run()
+    end
+    b:SetScript("OnClick", Run)
+    b:SetScript("OnEnter", function(self)
+        Tooltip(self, action.label, { action.tip, "Key while open: " .. action.key }, action.binding)
+    end)
+    b:SetScript("OnLeave", HideTooltip)
+    b:Hide()
+    actionByKey[action.key] = Run
+    table.insert(modeWidgets, b)
+end
+
 ------------------------------------------------------------------------
 -- Opening and closing
 ------------------------------------------------------------------------
@@ -436,11 +492,13 @@ local function ToggleOpen()
     if isOpen then Close() else Open() end
 end
 
--- Number keys 1-6 pick a mode while open; Escape closes.
+-- Number keys pick while open: 1-6 modes, 7 Regroup, 8 Dismiss. Escape closes.
 main:SetScript("OnKeyDown", function(_, key)
     local n = tonumber(key)
     if n and W.MODES[n] then
         Choose(W.MODES[n].key)
+    elseif n and actionByKey[n] then
+        actionByKey[n]()
     elseif key == "ESCAPE" then
         Close()
     end
@@ -723,6 +781,7 @@ W:On("RING", function()
 end)
 W:On("JOINED", function() PlayIf("ReadyCheck") end)
 W:On("PICK", OpenPicker)
+W:On("CONFIRM_DISMISS", function() StaticPopup_Show("BOTBRIGADE_DISMISS") end)
 
 W:On("SAY", function(sender, text)
     for _, s in ipairs(slots) do

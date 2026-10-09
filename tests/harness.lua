@@ -52,6 +52,9 @@ UIParent = Obj.new("Frame", "UIParent")
 function UIParent:GetHeight() return 768 end
 GameTooltip = Obj.new("GameTooltip", "GameTooltip")
 UISpecialFrames = {}
+StaticPopupDialogs = {}
+CANCEL = "Cancel"
+function StaticPopup_Show(name) LAST_POPUP = name end
 tinsert = table.insert
 RAID_CLASS_COLORS = setmetatable({}, { __index = function() return { r = 1, g = 1, b = 1 } end })
 UNKNOWNOBJECT = "Unknown"

@@ -5,7 +5,7 @@
 
 local W = {}
 BotBrigade = W
-W.version = "1.0.0"
+W.version = "1.1.0"
 
 ------------------------------------------------------------------------
 -- Static data
@@ -356,7 +356,7 @@ local function Bring(list)
         end
     end
     if #names == 0 then
-        W:Status(free <= 0 and "Your group is full." or "Your team is already here.", "info")
+        W:Status(free <= 0 and "Your group is full." or "Your team is already here. Use Regroup to bring them to you.", "info")
         return
     end
     W:SendServer(".playerbots bot add " .. table.concat(names, ","))
@@ -549,6 +549,52 @@ function W:ReviveTeam()
         self:Summon(name)
     end
     self:Status("Reviving " .. table.concat(dead, ", ") .. ".", "good")
+end
+
+-- Teleports everyone in the group to you now (also unsticks bots caught on scenery).
+-- Party chat reaches random bots as well as your own characters.
+function W:Regroup()
+    if not self:GroupChannel() then
+        self:Status("Call your team first: press Call Team.", "warn")
+        return
+    end
+    for k in pairs(farSince) do farSince[k] = nil end
+    local now = GetTime()
+    for _, m in ipairs(self:Members()) do
+        if m.name then lastSummon[m.name] = now end
+    end
+    self:SendParty("summon")
+    if self.db.mode ~= "stop" and not self.dc.enabled then
+        self:SendParty("follow")
+    end
+    self:Status("Bringing your team to you.", "good")
+end
+
+-- Logs your own characters out and asks every other bot to leave the group.
+function W:DismissTeam()
+    local alts, others = {}, 0
+    for _, m in ipairs(self:Members()) do
+        if m.name and self.db.alts[m.name] then
+            table.insert(alts, m.name)
+        elseif m.name then
+            others = others + 1
+        end
+    end
+    if #alts == 0 and others == 0 then
+        self:Status("There's nobody in your group to send home.", "info")
+        return
+    end
+    if self.dc.enabled then
+        self:SendDC("off")
+        self.dc.enabled = false
+    end
+    if #alts > 0 then
+        self:SendServer(".playerbots bot remove " .. table.concat(alts, ","))
+    end
+    if others > 0 then
+        self:SendParty("leave")
+    end
+    self:Status("Sending your team home.", "info")
 end
 
 local function Train(name, level)
@@ -1085,10 +1131,14 @@ BINDING_NAME_BOTBRIGADE_SMART = "Smart (dungeon)"
 BINDING_NAME_BOTBRIGADE_LEEROY = "Leeroy (dungeon)"
 BINDING_NAME_BOTBRIGADE_PULLBACK = "Careful (dungeon)"
 BINDING_NAME_BOTBRIGADE_STOP = "Wait Here"
+BINDING_NAME_BOTBRIGADE_REGROUP = "Regroup (bring everyone to me)"
+BINDING_NAME_BOTBRIGADE_DISMISS = "Dismiss team"
 
 function BotBrigade_Choose(key) W:Choose(key) end
 function BotBrigade_Ring() W:Fire("RING") end
 function BotBrigade_Pick() W:PickTeam() end
+function BotBrigade_Regroup() W:Regroup() end
+function BotBrigade_Dismiss() W:Fire("CONFIRM_DISMISS") end
 
 SLASH_BOTBRIGADE1 = "/brigade"
 SLASH_BOTBRIGADE2 = "/bb"
@@ -1102,6 +1152,10 @@ SlashCmdList.BOTBRIGADE = function(input)
         W:Fire("SCALE", tonumber(rest))
     elseif cmd == "reset" then
         W:Fire("RESET")
+    elseif cmd == "regroup" then
+        W:Regroup()
+    elseif cmd == "dismiss" then
+        W:Fire("CONFIRM_DISMISS")
     elseif cmd == "revive" then
         W:ReviveTeam()
     elseif cmd == "share" then

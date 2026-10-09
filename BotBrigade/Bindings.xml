@@ -7,4 +7,6 @@
 	<Binding name="BOTBRIGADE_LEEROY">BotBrigade_Choose("leeroy")</Binding>
 	<Binding name="BOTBRIGADE_PULLBACK">BotBrigade_Choose("pullback")</Binding>
 	<Binding name="BOTBRIGADE_STOP">BotBrigade_Choose("stop")</Binding>
+	<Binding name="BOTBRIGADE_REGROUP">BotBrigade_Regroup()</Binding>
+	<Binding name="BOTBRIGADE_DISMISS">BotBrigade_Dismiss()</Binding>
 </Bindings>

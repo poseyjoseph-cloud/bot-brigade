@@ -253,5 +253,31 @@ TICK(5)
 check(LOOT_METHOD == "needbeforegreed", "turning the option off leaves loot alone")
 W.db.autoLoot = true
 
+-- Regroup: everyone is teleported to you; key 7 in the open medallion does it too.
+PARTY = { { "Alpha", "MAGE" }, { "Eamon", "WARRIOR" }, { "Randa", "PRIEST" } }
+FIRE("PARTY_MEMBERS_CHANGED")
+TICK(9)
+W:Choose("quest")
+TICK(1)
+TAKE()
+BotBrigade_Ring()
+BotBrigadeFrame.scripts.OnKeyDown(BotBrigadeFrame, "7")
+TICK(1)
+out = TAKE()
+check(has(out, "PARTY | summon") and has(out, "PARTY | follow"), "Regroup (key 7) summons everyone and they follow")
+check(not W:IsOpen(), "the medallion closes after Regroup")
+
+-- Dismiss asks first, then logs out your characters and sends other bots away.
+LAST_POPUP = nil
+BotBrigade_Ring()
+BotBrigadeFrame.scripts.OnKeyDown(BotBrigadeFrame, "8")
+TICK(1)
+check(LAST_POPUP == "BOTBRIGADE_DISMISS" and #TAKE() == 0, "Dismiss asks for confirmation before doing anything")
+StaticPopupDialogs.BOTBRIGADE_DISMISS.OnAccept()
+TICK(1)
+out = TAKE()
+check(has(out, "SAY | .playerbots bot remove Alpha,Eamon"), "your own characters are logged out")
+check(has(out, "PARTY | leave"), "other bots are asked to leave the group")
+
 print(failures == 0 and "ALL PASSED" or (failures .. " FAILED"))
 os.exit(failures == 0 and 0 or 1)

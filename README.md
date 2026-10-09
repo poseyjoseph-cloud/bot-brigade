@@ -19,7 +19,7 @@ If the game was already running, close it fully and start it again. New add-ons 
 
 A round medallion appears on your screen with your banner in the middle.
 
-- **Your team** sits around the banner, with health bars and names.
+- **Your team** sits around the banner, with health and mana (or rage, energy, runic power) bars and names. The game's own party frames are hidden since the medallion replaces them; you can bring them back in the options.
 - **Click the banner** to open the medallion and choose what to do:
 
 | | Button | What it does |

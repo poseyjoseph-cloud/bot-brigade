@@ -5,7 +5,7 @@
 
 local W = {}
 BotBrigade = W
-W.version = "1.1.0"
+W.version = "1.2.0"
 
 ------------------------------------------------------------------------
 -- Static data
@@ -101,6 +101,7 @@ local DEFAULTS = {
     autoGather = true, -- bring teammates back when they fall far behind (travel, getting stuck)
     autoTrain = true,  -- teammates learn new skills when they level up
     autoLoot = true,   -- Free for All while questing (all loot is yours), Need Before Greed in dungeons
+    hidePartyFrames = true, -- the medallion shows the team, so the game's party frames are hidden
     mode = "quest",
     alts = {},   -- [name] = class token, from the server's roster of your own characters
     team = {},   -- [name] = true for the characters Call Team brings (chosen in the team picker)

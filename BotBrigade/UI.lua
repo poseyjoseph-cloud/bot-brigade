@@ -239,18 +239,27 @@ for i = 1, #TEAM_ANGLES do
     s:SetScript("OnDragStop", StopMove)
     local outward = (y > 0) and 1 or -1 -- top pair: bar and name above; bottom pair: below
 
-    local bar = CreateFrame("StatusBar", nil, s)
-    Size(bar, 40, 5)
-    bar:SetPoint("CENTER", s, "CENTER", 0, outward * (TEAM_SIZE / 2 + 5))
-    bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
-    bar:SetMinMaxValues(0, 1)
-    local barBack = bar:CreateTexture(nil, "BACKGROUND")
-    barBack:SetAllPoints()
-    barBack:SetTexture(0, 0, 0, 0.85)
+    -- Health bar, then a thin power bar (mana, rage, energy, runic power) just outside it.
+    local function Bar(height)
+        local b = CreateFrame("StatusBar", nil, s)
+        Size(b, 40, height)
+        b:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
+        b:SetMinMaxValues(0, 1)
+        local back = b:CreateTexture(nil, "BACKGROUND")
+        back:SetAllPoints()
+        back:SetTexture(0, 0, 0, 0.85)
+        return b
+    end
+    local bar = Bar(4)
+    bar:SetPoint("CENTER", s, "CENTER", 0, outward * (TEAM_SIZE / 2 + 4))
     s.bar = bar
+    local power = Bar(3)
+    power:SetPoint("CENTER", bar, "CENTER", 0, outward * 4.5)
+    power:Hide()
+    s.power = power
 
     local name = Text(s, "GameFontNormalSmall")
-    name:SetPoint("CENTER", bar, "CENTER", 0, outward * 9)
+    name:SetPoint("CENTER", bar, "CENTER", 0, outward * 12)
     s.name = name
 
     local plus = Text(s, "GameFontDisableLarge")
@@ -509,6 +518,7 @@ end)
 ------------------------------------------------------------------------
 
 local menuFrame = CreateFrame("Frame", "BotBrigadeMenu", UIParent, "UIDropDownMenuTemplate")
+local HidePartyFrames -- defined below, with the refresh code
 
 local function OpenMateMenu(slot)
     local m = slot.member
@@ -574,6 +584,15 @@ local function OpenOptions()
           func = function() db.autoGather = not db.autoGather end },
         { text = "Teammates learn new skills on level-up", checked = db.autoTrain,
           func = function() db.autoTrain = not db.autoTrain end },
+        { text = "Hide the game's party frames", checked = db.hidePartyFrames,
+          func = function()
+              db.hidePartyFrames = not db.hidePartyFrames
+              if db.hidePartyFrames then
+                  HidePartyFrames()
+              else
+                  DEFAULT_CHAT_FRAME:AddMessage("|cffffd100Bot Brigade|r: type /reload to bring back the game's party frames.")
+              end
+          end },
         { text = "Set loot rules for me", checked = db.autoLoot,
           func = function() db.autoLoot = not db.autoLoot; W:ApplyLootRule() end },
         { text = "Sounds", checked = db.sound, func = function() db.sound = not db.sound end },
@@ -657,6 +676,7 @@ local function RefreshSlots()
             s.ring:SetVertexColor(0.45, 0.45, 0.45)
             s.plus:Show()
             s.bar:Hide()
+            s.power:Hide()
             s.name:SetText("")
             s:SetAlpha(0.6)
             s.bubble:Hide()
@@ -679,6 +699,16 @@ local function RefreshLive()
                 s.bar:SetStatusBarColor(0.9, 0.15, 0.1)
             else
                 s.bar:SetStatusBarColor(0.1, 0.85, 0.1)
+            end
+            local powerMax = UnitPowerMax(unit)
+            if powerMax and powerMax > 0 and not dead then
+                local _, token = UnitPowerType(unit)
+                local c = (PowerBarColor and PowerBarColor[token]) or { r = 0, g = 0.45, b = 1 }
+                s.power:SetStatusBarColor(c.r, c.g, c.b)
+                s.power:SetValue(UnitPower(unit) / powerMax)
+                s.power:Show()
+            else
+                s.power:Hide()
             end
             s.art:SetDesaturated(dead or not online)
             if dead then
@@ -755,6 +785,30 @@ local function ApplyShown()
     end
 end
 
+-- The game's own party frames repeat what the medallion shows, so they're hidden
+-- (option, on by default). Protected frames can't be hidden during a fight, so
+-- this waits for the fight to end if needed.
+local partyFramesHidden, hidePartyAfterCombat = false, false
+local function Nothing() end
+function HidePartyFrames()
+    if partyFramesHidden or not W.db.hidePartyFrames then return end
+    if InCombatLockdown() then
+        hidePartyAfterCombat = true
+        return
+    end
+    for i = 1, (MAX_PARTY_MEMBERS or 4) do
+        for _, name in ipairs({ "PartyMemberFrame" .. i, "PartyMemberFrame" .. i .. "PetFrame" }) do
+            local f = _G[name]
+            if f then
+                f:UnregisterAllEvents()
+                f:Hide()
+                f.Show = Nothing
+            end
+        end
+    end
+    partyFramesHidden = true
+end
+
 local function Refresh()
     RefreshSlots()
     RefreshLive()
@@ -762,6 +816,7 @@ local function Refresh()
 end
 
 W:On("READY", function()
+    HidePartyFrames()
     RestorePosition()
     ApplyScale()
     SetOpen(false)
@@ -818,7 +873,15 @@ local ticker = CreateFrame("Frame")
 local since = 0
 ticker:RegisterEvent("UNIT_PORTRAIT_UPDATE")
 ticker:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+ticker:RegisterEvent("PLAYER_REGEN_ENABLED")
 ticker:SetScript("OnEvent", function(_, event)
+    if event == "PLAYER_REGEN_ENABLED" then
+        if hidePartyAfterCombat then
+            hidePartyAfterCombat = false
+            HidePartyFrames()
+        end
+        return
+    end
     if event == "UNIT_PORTRAIT_UPDATE" then RefreshSlots() end
     RefreshMode()
 end)

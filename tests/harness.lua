@@ -107,6 +107,17 @@ function SetLootMethod(m) LOOT_METHOD = m; table.insert(SENT, "LOOT | " .. m) en
 function UnitOnTaxi() return false end
 function UnitAffectingCombat() return IN_COMBAT end
 function UnitLevel(unit) return LEVELS[UnitName(unit) or ""] or 10 end
+POWER = {}
+PowerBarColor = { MANA = { r = 0, g = 0, b = 1 }, RAGE = { r = 1, g = 0, b = 0 } }
+function UnitPowerMax(unit) local p = POWER[UnitName(unit) or ""]; return p and 100 or 0 end
+function UnitPower(unit) local p = POWER[UnitName(unit) or ""]; return p and p[2] or 0 end
+function UnitPowerType(unit) local p = POWER[UnitName(unit) or ""]; return 0, p and p[1] or "MANA" end
+function InCombatLockdown() return IN_COMBAT end
+MAX_PARTY_MEMBERS = 4
+for i = 1, 4 do
+    local f = Obj.new("Frame", "PartyMemberFrame" .. i); f.shown = true
+    local pet = Obj.new("Frame", "PartyMemberFrame" .. i .. "PetFrame"); pet.shown = true
+end
 function UnitHealth() return 50 end
 function UnitHealthMax() return 100 end
 function UnitIsDeadOrGhost(unit) return DEAD[UnitName(unit) or ""] or false end

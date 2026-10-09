@@ -26,6 +26,9 @@ TICK(6)
 check(#TAKE() == 0, "sends nothing on load or world entry")
 check(BotBrigadeFrame:IsShown(), "medallion is shown")
 check(not W:IsOpen(), "medallion starts closed")
+check(not PartyMemberFrame1:IsShown() and not PartyMemberFrame4PetFrame:IsShown(), "the game's party frames are hidden")
+PartyMemberFrame1:Show()
+check(not PartyMemberFrame1:IsShown(), "and they stay hidden")
 
 -- My Team with no known alts: asks the roster, then calls them when it arrives.
 W:Choose("team")
@@ -278,6 +281,12 @@ TICK(1)
 out = TAKE()
 check(has(out, "SAY | .playerbots bot remove Alpha,Eamon"), "your own characters are logged out")
 check(has(out, "PARTY | leave"), "other bots are asked to leave the group")
+
+-- Power bars: mana and rage teammates update without errors.
+POWER.Alpha = { "MANA", 40 }
+POWER.Eamon = { "RAGE", 10 }
+local ok = pcall(TICK, 1)
+check(ok, "mana and rage bars update without errors")
 
 print(failures == 0 and "ALL PASSED" or (failures .. " FAILED"))
 os.exit(failures == 0 and 0 or 1)

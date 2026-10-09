@@ -2,7 +2,7 @@
 ## Title: |cffffd200Bot Brigade|r
 ## Notes: Call your alts and pick a mode: quest together, or let the tank lead the dungeon.
 ## Author: Joseph & Claude
-## Version: 1.2.0
+## Version: 1.2.1
 ## SavedVariablesPerCharacter: BotBrigadeDB
 Core.lua
 UI.lua

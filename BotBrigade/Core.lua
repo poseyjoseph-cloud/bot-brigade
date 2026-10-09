@@ -5,7 +5,7 @@
 
 local W = {}
 BotBrigade = W
-W.version = "1.2.0"
+W.version = "1.2.1"
 
 ------------------------------------------------------------------------
 -- Static data
@@ -269,6 +269,13 @@ function W:Member(name)
     end
 end
 
+-- In the group and actually online. After a disconnect, bots can stay in the group
+-- as offline members; those need calling again.
+function W:IsHere(name)
+    local m = self:Member(name)
+    return m ~= nil and UnitIsConnected(m.unit) and true or false
+end
+
 function W:FreeSlots()
     if GetNumRaidMembers() > 0 then return 0 end
     return MAX_PARTY_OTHERS - GetNumPartyMembers()
@@ -345,10 +352,12 @@ end
 
 local function Bring(list)
     local free = W:FreeSlots()
-    local names, left = {}, {}
+    local names, left, used = {}, {}, 0
     for _, name in ipairs(list) do
-        if not W:Member(name) then
-            if #names < free then
+        if not W:IsHere(name) then
+            local offlineMember = W:Member(name) ~= nil -- already holds a place in the group
+            if offlineMember or used < free then
+                if not offlineMember then used = used + 1 end
                 table.insert(names, name)
                 pendingAdds[name] = GetTime()
             else
@@ -573,15 +582,19 @@ end
 
 -- Logs your own characters out and asks every other bot to leave the group.
 function W:DismissTeam()
-    local alts, others = {}, 0
+    local alts, others, offline = {}, 0, {}
     for _, m in ipairs(self:Members()) do
-        if m.name and self.db.alts[m.name] then
+        if m.name and not UnitIsConnected(m.unit) then
+            table.insert(offline, m.name)
+        elseif m.name and self.db.alts[m.name] then
             table.insert(alts, m.name)
         elseif m.name then
             others = others + 1
         end
     end
-    if #alts == 0 and others == 0 then
+    -- Offline members can't log out or leave by themselves; take them out of the group.
+    for _, name in ipairs(offline) do UninviteUnit(name) end
+    if #alts == 0 and others == 0 and #offline == 0 then
         self:Status("There's nobody in your group to send home.", "info")
         return
     end
@@ -828,17 +841,41 @@ end
 -- dungeons lets teammates roll on gear they can use.
 local LOOT_NAMES = { freeforall = "Free for All", needbeforegreed = "Need Before Greed" }
 
-function W:ApplyLootRule()
-    if not (self.db and self.db.autoLoot) then return end
+-- The server kicks anyone who changes the loot rule more than 3 times in one second
+-- (AzerothCore anti-flood, CMSG_LOOT_METHOD). Group changes arrive in bursts and the
+-- server takes a moment to confirm a change, so checks are merged into one, at most
+-- one change is sent every few seconds, and the same change is never re-sent while
+-- the server is still confirming it.
+local LOOT_CHECK_DELAY = 2
+local LOOT_CONFIRM_WAIT = 10
+local lootCheckPending = false
+local lastLootSent, lastLootWanted = 0, nil
+
+local function LootCheck()
+    if not (W.db and W.db.autoLoot) then return end
     if GetNumRaidMembers() > 0 or GetNumPartyMembers() == 0 or not IsPartyLeader() then return end
-    local wanted = self:InDungeon() and "needbeforegreed" or "freeforall"
+    local wanted = W:InDungeon() and "needbeforegreed" or "freeforall"
     if GetLootMethod() == wanted then return end
+    local now = GetTime()
+    if now - lastLootSent < LOOT_CONFIRM_WAIT and lastLootWanted == wanted then return end
+    if now - lastLootSent < LOOT_CHECK_DELAY then return end
+    lastLootSent, lastLootWanted = now, wanted
     SetLootMethod(wanted)
     if wanted == "freeforall" then
-        self:Status("Loot set to Free for All: quest items and drops are all yours.", "info")
+        W:Status("Loot set to Free for All: quest items and drops are all yours.", "info")
     else
-        self:Status("Loot set to Need Before Greed: your team can roll on gear in here.", "info")
+        W:Status("Loot set to Need Before Greed: your team can roll on gear in here.", "info")
     end
+end
+
+-- Asks for one loot check a moment from now; repeated asks merge into that one.
+function W:ApplyLootRule()
+    if lootCheckPending then return end
+    lootCheckPending = true
+    self:After(LOOT_CHECK_DELAY, function()
+        lootCheckPending = false
+        LootCheck()
+    end)
 end
 
 function W:Mode()
@@ -918,12 +955,12 @@ end
 -- Watching the party change
 ------------------------------------------------------------------------
 
-local lastMembers = {}
+local lastMembers = {} -- [name] = true when last seen in the group and online
 
 local function SeedMembers()
     lastMembers = {}
     for _, m in ipairs(W:Members()) do
-        if m.name then lastMembers[m.name] = true end
+        if m.name then lastMembers[m.name] = UnitIsConnected(m.unit) and true or false end
     end
 end
 
@@ -945,12 +982,14 @@ function W:OnGroupChanged()
     local current = {}
     for _, m in ipairs(self:Members()) do
         if m.name and m.name ~= UNKNOWNOBJECT then
-            current[m.name] = true
-            if not lastMembers[m.name] then OnJoined(m) end
+            local online = UnitIsConnected(m.unit) and true or false
+            current[m.name] = online
+            -- Joining, or coming back online while still in the group, both count.
+            if online and not lastMembers[m.name] then OnJoined(m) end
         end
     end
     lastMembers = current
-    self:After(1, function() self:ApplyLootRule() end)
+    self:ApplyLootRule()
     for _, m in ipairs(self:Members()) do
         if m.name and not knownLevel[m.name] then knownLevel[m.name] = UnitLevel(m.unit) end
     end
@@ -1069,7 +1108,8 @@ end
 local events = CreateFrame("Frame")
 for _, e in ipairs({ "ADDON_LOADED", "PLAYER_ENTERING_WORLD", "PLAYER_LEAVING_WORLD", "PARTY_MEMBERS_CHANGED",
     "RAID_ROSTER_UPDATE", "CHAT_MSG_WHISPER", "CHAT_MSG_PARTY", "CHAT_MSG_PARTY_LEADER", "CHAT_MSG_RAID",
-    "CHAT_MSG_RAID_LEADER", "CHAT_MSG_SYSTEM", "CHAT_MSG_ADDON", "QUEST_ACCEPTED", "UNIT_LEVEL", "PLAYER_REGEN_ENABLED", "PARTY_LEADER_CHANGED" }) do
+    "CHAT_MSG_RAID_LEADER", "CHAT_MSG_SYSTEM", "CHAT_MSG_ADDON", "QUEST_ACCEPTED", "UNIT_LEVEL", "PLAYER_REGEN_ENABLED", "PARTY_LEADER_CHANGED",
+    "PARTY_MEMBER_ENABLE", "PARTY_MEMBER_DISABLE" }) do
     events:RegisterEvent(e)
 end
 
@@ -1095,17 +1135,18 @@ events:SetScript("OnEvent", function(_, event, arg1, arg2, arg3, arg4)
         W:Fire("DUNGEON")
         -- A chosen dungeon mode picks up once the loading screen is over.
         W:After(4, ResumeDungeonMode)
-        W:After(2, function() W:ApplyLootRule() end)
+        W:ApplyLootRule()
     elseif event == "PLAYER_LEAVING_WORLD" then
         W:ClearQueue()
-    elseif event == "PARTY_MEMBERS_CHANGED" or event == "RAID_ROSTER_UPDATE" then
+    elseif event == "PARTY_MEMBERS_CHANGED" or event == "RAID_ROSTER_UPDATE"
+        or event == "PARTY_MEMBER_ENABLE" or event == "PARTY_MEMBER_DISABLE" then
         W:OnGroupChanged()
     elseif event == "CHAT_MSG_WHISPER" then
         OnWhisper(arg1, arg2)
     elseif event == "CHAT_MSG_SYSTEM" then
         OnSystem(arg1)
     elseif event == "PARTY_LEADER_CHANGED" then
-        W:After(1, function() W:ApplyLootRule() end)
+        W:ApplyLootRule()
     elseif event == "UNIT_LEVEL" then
         OnUnitLevel(arg1)
     elseif event == "PLAYER_REGEN_ENABLED" then

@@ -288,5 +288,53 @@ POWER.Eamon = { "RAGE", 10 }
 local ok = pcall(TICK, 1)
 check(ok, "mana and rage bars update without errors")
 
+-- Anti-flood: a burst of group changes while the server is slow to confirm must never
+-- change the loot rule more than once a second (the server kicks at 4 per second).
+LOOT_LAG = true
+LOOT_METHOD = "group"
+IN_DUNGEON = false
+LOOT_LOG = {}
+for _ = 1, 6 do FIRE("PARTY_MEMBERS_CHANGED") end
+FIRE("PARTY_LEADER_CHANGED")
+TICK(1)
+for _ = 1, 6 do FIRE("PARTY_MEMBERS_CHANGED") end
+TICK(15)
+local perSecond = {}
+local worst = 0
+for _, t in ipairs(LOOT_LOG) do
+    local s = math.floor(t)
+    perSecond[s] = (perSecond[s] or 0) + 1
+    if perSecond[s] > worst then worst = perSecond[s] end
+end
+check(#LOOT_LOG >= 1 and worst <= 1, "a burst of group changes sends at most one loot change per second")
+check(#LOOT_LOG <= 2, "an unconfirmed loot change is not repeated over and over")
+LOOT_LAG = false
+TAKE()
+
+-- After a disconnect: teammates still in the group but offline are called again.
+PARTY = { { "Alpha", "MAGE" }, { "Eamon", "WARRIOR" } }
+OFFLINE = { Alpha = true, Eamon = true }
+FIRE("PARTY_MEMBERS_CHANGED")
+TICK(3)
+TAKE()
+W.db.team = { Alpha = true, Eamon = true }
+W:Choose("team")
+TICK(1)
+check(has(TAKE(), "SAY | .playerbots bot add Alpha,Eamon"), "offline teammates in the group are logged back in by Call Team")
+OFFLINE = {}
+FIRE("PARTY_MEMBER_ENABLE")
+TICK(3)
+out = TAKE()
+check(has(out, "WHISPER:Alpha | summon") and has(out, "WHISPER:Eamon | follow"), "teammates coming back online are brought over and follow")
+
+-- Dismiss removes offline members from the group.
+OFFLINE = { Alpha = true }
+UNINVITED = {}
+StaticPopupDialogs.BOTBRIGADE_DISMISS.OnAccept()
+TICK(1)
+check(UNINVITED[1] == "Alpha", "Dismiss takes offline teammates out of the group")
+OFFLINE = {}
+TAKE()
+
 print(failures == 0 and "ALL PASSED" or (failures .. " FAILED"))
 os.exit(failures == 0 and 0 or 1)

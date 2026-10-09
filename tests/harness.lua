@@ -103,7 +103,16 @@ IN_COMBAT = false
 LOOT_METHOD = "group"
 function IsPartyLeader() return true end
 function GetLootMethod() return LOOT_METHOD end
-function SetLootMethod(m) LOOT_METHOD = m; table.insert(SENT, "LOOT | " .. m) end
+LOOT_LAG = false -- true: the server hasn't confirmed loot changes yet
+LOOT_LOG = {}
+function SetLootMethod(m)
+    if not LOOT_LAG then LOOT_METHOD = m end
+    table.insert(SENT, "LOOT | " .. m)
+    table.insert(LOOT_LOG, GetTime())
+end
+OFFLINE = {}
+UNINVITED = {}
+function UninviteUnit(name) table.insert(UNINVITED, name) end
 function UnitOnTaxi() return false end
 function UnitAffectingCombat() return IN_COMBAT end
 function UnitLevel(unit) return LEVELS[UnitName(unit) or ""] or 10 end
@@ -121,7 +130,7 @@ end
 function UnitHealth() return 50 end
 function UnitHealthMax() return 100 end
 function UnitIsDeadOrGhost(unit) return DEAD[UnitName(unit) or ""] or false end
-function UnitIsConnected() return true end
+function UnitIsConnected(unit) return not OFFLINE[UnitName(unit) or ""] end
 function UnitInRange(unit) return not FAR[UnitName(unit) or ""] end
 QUESTS = { { "Elwynn", true }, { "Wolves Across the Border" }, { "Kobold Camp Cleanup" }, { "A Daily Chore", false, false } }
 local selected = 0
